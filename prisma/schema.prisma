@@ -1,0 +1,137 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  seed     = "ts-node --transpile-only prisma/seed.ts"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS
+enum GenderTitleVN {
+  MaleVN   @map("Ông")
+  FemaleVN @map("Bà")
+}
+
+enum GenderTitleEN {
+  MaleEN   @map("Mr")
+  FemaleEN @map("Ms")
+}
+
+enum ActionType {
+  manage
+  create
+  read
+  update
+  delete
+}
+
+enum SubjectName {
+  Customer
+  User
+}
+
+// MODELS
+model Gender {
+  id      Int           @id @default(autoincrement())
+  titleVN GenderTitleVN @unique @map("title_vn")
+  titleEN GenderTitleEN @unique @map("title_en")
+
+  users User[]
+}
+
+model Company {
+  id        Int    @id @default(autoincrement())
+  shortName String @map("short_name")
+  fullName  String @map("full_name")
+  address   String
+  taxCode   String @unique @map("tax_code")
+
+  users User[]
+}
+
+model CompanyArea {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  users User[]
+}
+
+model Role {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  description String
+
+  users               User[]
+  roleWithPermissions RolesWithPermissions[]
+}
+
+model Permission {
+  id        Int        @id @default(autoincrement())
+  action    ActionType
+  subjectId Int        @map("subject_id")
+  condition Json?
+
+  subject             Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  permissionWithRoles RolesWithPermissions[]
+
+  @@unique(fields: [action, subjectId, condition], name: "unique_permission")
+}
+
+model RolesWithPermissions {
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Subject {
+  id   Int         @id @default(autoincrement())
+  name SubjectName @unique
+
+  permissions Permission[]
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  password            String
+  nameVN              String   @map("name_vn")
+  nameEN              String   @map("name_en")
+  genderId            Int      @map("gender_id")
+  phoneNumber         String   @map("phone_number")
+  roleId              Int      @map("role_id")
+  companyId           Int      @map("company_id")
+  companyAreaId       Int      @map("company_area_id")
+  currentRefreshToken String?  @map("current_refresh_token")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  gender    Gender      @relation(fields: [genderId], references: [id])
+  role      Role        @relation(fields: [roleId], references: [id])
+  company   Company     @relation(fields: [companyId], references: [id])
+  area      CompanyArea @relation(fields: [companyAreaId], references: [id])
+  customers Customer[]
+}
+
+model Customer {
+  id        Int       @id @default(autoincrement())
+  taxCode   String    @unique @map("tax_code")
+  shortName String    @map("short_name")
+  fullName  String    @map("full_name")
+  address   String
+  userId    String    @map("user_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? // Soft delete: this will be null when the record is active
+
+  user User @relation(fields: [userId], references: [id])
+}
